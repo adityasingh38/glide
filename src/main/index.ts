@@ -4,7 +4,14 @@ import { createSuggestionWindow } from './suggestion-window'
 import { startKeystrokeTracker, stopKeystrokeTracker, acceptSuggestion, dismissSuggestion, triggerPrediction } from './keystroke-tracker'
 import { readSettings, writeSettings } from './store'
 import { testConnection } from './claude-client'
+import { log, logPath } from './log'
 import type { Settings } from './store'
+
+// Pin the app name BEFORE anything touches app.getPath('userData').
+// Running `electron out/main/index.js` unpackaged otherwise defaults the name to
+// "Electron", so settings/logs land in %APPDATA%\Electron in dev but
+// %APPDATA%\Glide once packaged — two different stores for the same app.
+app.setName('Glide')
 
 let tray: Tray | null = null
 let settingsWin: BrowserWindow | null = null
@@ -15,23 +22,20 @@ function createSettingsWindow(): void {
     return
   }
   settingsWin = new BrowserWindow({
-    width: 460,
-    height: 640,
+    width: 520,
+    height: 724,
     resizable: false,
     frame: false,
     show: false,
     transparent: true,
-    // Opaque fallback for Windows 10 (Mica not available)
     backgroundColor: '#00000000',
+    hasShadow: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false
     }
   })
-
-  // Windows 11 Mica material — silently no-ops on Win10
-  try { (settingsWin as any).setBackgroundMaterial('mica') } catch {}
 
   settingsWin.once('ready-to-show', () => settingsWin!.show())
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -64,15 +68,28 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(null)
   app.dock?.hide()
 
+  const s = readSettings()
+  log('=== glide started ===')
+  log('logging to', logPath())
+  log('settings: enabled=' + s.enabled, 'trigger=' + s.trigger, 'model=' + s.model,
+      'hasKey=' + Boolean(s.apiKey), 'maxTokens=' + s.maxTokens)
+
   createSuggestionWindow()
-  startKeystrokeTracker()
+  try {
+    startKeystrokeTracker()
+    log('keystroke tracker started')
+  } catch (e) {
+    log('KEYSTROKE TRACKER FAILED:', e instanceof Error ? e.message : String(e))
+  }
 
   globalShortcut.register('Ctrl+Shift+Space', () => {
     const { enabled } = readSettings()
     if (enabled) triggerPrediction()
   })
 
-  globalShortcut.register('Escape', () => dismissSuggestion())
+  // NOTE: Escape is deliberately NOT a globalShortcut — that would consume it
+  // system-wide and break Esc in every app. The passive uiohook keydown handler
+  // in keystroke-tracker dismisses on Escape without swallowing the key.
 
   const iconPath = join(__dirname, '../../build/tray.png')
   const rawIcon = nativeImage.createFromPath(iconPath)
