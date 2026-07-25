@@ -15,7 +15,7 @@ function createSettingsWindow(): void {
   }
   settingsWin = new BrowserWindow({
     width: 500,
-    height: 640,
+    height: 580,
     resizable: false,
     frame: false,
     show: false,
@@ -84,6 +84,7 @@ app.whenReady().then(() => {
   tray.setToolTip('Glide')
   tray.setContextMenu(buildTrayMenu())
   tray.on('click', () => tray?.popUpContextMenu())
+
 
   ipcMain.handle('settings:get', () => readSettings())
   ipcMain.handle('settings:set', (_e, patch: Partial<Settings>) => {
