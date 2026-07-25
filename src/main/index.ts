@@ -5,6 +5,7 @@ import { startKeystrokeTracker, stopKeystrokeTracker, acceptSuggestion, dismissS
 import { readSettings, writeSettings } from './store'
 import { testConnection } from './claude-client'
 import { log, logPath } from './log'
+import { initLocalModel, warmLocal, disposeLocalModel, localStatus } from './local-model'
 import type { Settings } from './store'
 
 // Pin the app name BEFORE anything touches app.getPath('userData').
@@ -47,9 +48,16 @@ function createSettingsWindow(): void {
 }
 
 function buildTrayMenu(): Menu {
-  const { enabled } = readSettings()
+  const { enabled, engine } = readSettings()
+  const local = localStatus()
+  const engineLabel =
+    engine === 'cloud' ? 'Cloud' :
+    local.status === 'ready' ? (engine === 'local' ? 'Local' : 'Local + Cloud') :
+    local.status === 'loading' ? 'Loading local model…' :
+    local.status === 'unavailable' ? 'Cloud (local unavailable)' : 'Cloud'
   return Menu.buildFromTemplate([
     { label: enabled ? '● Active' : '○ Paused', enabled: false },
+    { label: `   ${engineLabel}`, enabled: false },
     { type: 'separator' },
     {
       label: enabled ? 'Pause' : 'Resume',
@@ -115,11 +123,23 @@ app.whenReady().then(() => {
   })
   ipcMain.on('window:close', () => settingsWin?.close())
   ipcMain.handle('api:test', () => testConnection())
+  ipcMain.handle('local:status', () => localStatus())
+
+  // Load the on-device model in the background. It takes ~35s cold, so it must
+  // never block startup — predictions fall back to the cloud until it's ready.
+  if (s.engine !== 'cloud') {
+    void (async () => {
+      const ok = await initLocalModel()
+      if (ok) await warmLocal(readSettings().userFacts ?? '')
+      tray?.setContextMenu(buildTrayMenu())
+    })()
+  }
 })
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll()
   stopKeystrokeTracker()
+  void disposeLocalModel()
 })
 
 app.on('window-all-closed', () => { /* tray-only app */ })

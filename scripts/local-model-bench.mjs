@@ -23,13 +23,16 @@ const MODEL = join(
 // speed the extra prefill is affordable — the whole point of the latency headroom.
 const FACTS = `About me: My name is Aditya Singh. I live in Ahmedabad, India. I work at CultureX Entertainment as the Founder's Office Executive. I build Windows and React Native apps.\n\n`
 
-// Same shapes the app actually sees
+// The shapes this user actually types: prompting an AI, writing emails, and
+// filling in web forms. Code is deliberately a minority here.
 const CASES = [
-  'my name is',
-  'it is raining in',
-  'the meeting is scheduled for',
-  'i am working on a project called',
-  'function getUserById'
+  'Hi Sarah, thanks for taking the time to',
+  'Just following up on my previous email about',
+  'Could you please review the attached and let me',
+  'Can you explain how this function',
+  'Write a script that reads the CSV and',
+  'I am looking for a tool that can',
+  'Apologies for the delay, I have been'
 ]
 
 const SYSTEM = `You are a text autocomplete engine. Continue the user's text with the next 2-8 words only.

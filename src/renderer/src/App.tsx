@@ -37,7 +37,14 @@ interface Settings {
   screenContext: boolean
   userFacts: string
   theme: 'light' | 'dark'
+  engine: 'cloud' | 'local' | 'hybrid'
 }
+
+const ENGINES: Array<{ id: Settings['engine']; name: string; note: string }> = [
+  { id: 'hybrid', name: 'Hybrid',     note: 'Instant, then refined' },
+  { id: 'local',  name: 'On-device',  note: '~30ms, offline' },
+  { id: 'cloud',  name: 'Cloud',      note: 'Best quality' },
+]
 
 declare global {
   interface Window {
@@ -49,6 +56,7 @@ declare global {
       testConnection: () => Promise<{ ok: boolean; error?: string }>
       onSuggestionUpdate: (cb: (text: string) => void) => void
       onSuggestionAppend: (cb: (token: string) => void) => void
+      getLocalStatus: () => Promise<{ status: string; detail: string }>
     }
   }
 }
@@ -72,6 +80,20 @@ export default function App() {
   // Personal facts save separately — an explicit button, so you can tell it landed
   const [factsDraft, setFactsDraft] = useState('')
   const [factsSaved, setFactsSaved] = useState(false)
+  const [local, setLocal] = useState<{ status: string; detail: string }>({ status: 'idle', detail: '' })
+
+  // The model loads for ~35s in the background, so poll while it's still coming up
+  useEffect(() => {
+    let stop = false
+    const tick = async () => {
+      const st = await window.glide.getLocalStatus()
+      if (stop) return
+      setLocal(st)
+      if (st.status === 'loading' || st.status === 'idle') setTimeout(tick, 1500)
+    }
+    void tick()
+    return () => { stop = true }
+  }, [])
 
   useEffect(() => {
     window.glide.getSettings().then(v => {
@@ -176,7 +198,35 @@ export default function App() {
               <p className="err">{connErr.length > 110 ? connErr.slice(0, 110) + '…' : connErr}</p>
             )}
 
-            <Row label="Model" desc="Which Claude model writes the prediction" />
+            <Row
+              label="Engine"
+              descNode={
+                s.engine === 'cloud'
+                  ? <span className="stat stat--dim">Claude only, around 850ms</span>
+                  : local.status === 'ready'
+                    ? <span className="stat stat--ok">On-device ready · {local.detail}</span>
+                    : local.status === 'loading'
+                      ? <span className="stat stat--dim">Loading model… using cloud meanwhile</span>
+                      : local.status === 'unavailable'
+                        ? <span className="stat stat--err">On-device unavailable — using cloud</span>
+                        : <span className="stat stat--dim">Starting…</span>
+              }
+            >
+              <div className="seg">
+                {ENGINES.map(e => (
+                  <button
+                    key={e.id}
+                    className={`sbtn${s.engine === e.id ? ' sbtn--on' : ''}`}
+                    title={e.note}
+                    onClick={() => update({ engine: e.id })}
+                  >
+                    {e.name}
+                  </button>
+                ))}
+              </div>
+            </Row>
+
+            <Row label="Cloud model" desc="Used for the refined suggestion" />
             <div className="cards">
               {MODELS.map(m => {
                 const on = s.model === m.id

@@ -4,6 +4,7 @@ import { streamCompletion, type CompletionContext } from './claude-client'
 import { showSuggestion, appendSuggestion, hideSuggestion } from './suggestion-window'
 import { getScreenFrame, refreshScreenFrame } from './screen-context'
 import { recordAccepted, recentExamples } from './learned'
+import { completeLocal, isLocalReady } from './local-model'
 import { readSettings } from './store'
 import { sendCtrlV, getActiveWindowTitle, getForegroundWindowId, nudgeAccessibility, getFocusedFieldText } from './win32'
 import { log } from './log'
@@ -210,7 +211,7 @@ export async function triggerPrediction(): Promise<void> {
 
   abortStream()
 
-  const { clipboardContext, screenContext } = readSettings()
+  const { clipboardContext, screenContext, engine, userFacts } = readSettings()
   const ctx: CompletionContext = {}
 
   if (screenContext) {
@@ -241,16 +242,60 @@ export async function triggerPrediction(): Promise<void> {
   }
   const promptText = field && field.before.length > buffer.length ? field.before : buffer
 
-  const controller = new AbortController()
-  streamController = controller
-  currentSuggestion = ''
-
   // Reconciliation compares against what the USER typed, so predictedFrom must
   // stay the keystroke buffer even when the prompt used richer field text.
   const requestedFrom = buffer
-  predictedFrom = requestedFrom
   const t0 = Date.now()
   log('predict from:', JSON.stringify(promptText.slice(-60)))
+
+  // ── Local first: ~30-76ms versus ~850ms for the cloud. Show something the
+  // instant we can, then let the cloud improve on it. ──
+  const useLocal = engine !== 'cloud' && isLocalReady()
+  if (useLocal) {
+    let firstAt = 0
+    // Stream it onto the screen: the first token arrives in ~30ms even though the
+    // full answer takes ~130ms. The local model also gets only the immediate tail —
+    // prompt length is prefill time, and prefill is the latency budget.
+    const localText = await completeLocal(
+      promptText.slice(-160),
+      userFacts ?? '',
+      (soFar) => {
+        if (!buffer.startsWith(requestedFrom)) return
+        currentSuggestion = soFar
+        predictedFrom = requestedFrom
+        const r = reconcile(requestedFrom, currentSuggestion, buffer)
+        if (r.state !== 'show') return
+        if (!firstAt) {
+          firstAt = Date.now() - t0
+          log(`local first token in ${firstAt}ms`)
+        }
+        showSuggestion(r.text)
+        if (!suggestionVisible) { suggestionVisible = true; registerTab() }
+      }
+    )
+
+    if (localText && buffer.startsWith(requestedFrom)) {
+      currentSuggestion = localText
+      predictedFrom = requestedFrom
+      const r = reconcile(requestedFrom, currentSuggestion, buffer)
+      log(`local done in ${Date.now() - t0}ms: ${JSON.stringify(localText)} [${r.state}]`)
+      if (r.state === 'show') {
+        showSuggestion(r.text)
+        if (!suggestionVisible) { suggestionVisible = true; registerTab() }
+      }
+    } else {
+      log(`local done in ${Date.now() - t0}ms: discarded (empty or buffer moved on)`)
+    }
+  }
+
+  if (engine === 'local') return
+
+  const controller = new AbortController()
+  streamController = controller
+  predictedFrom = requestedFrom
+  // The cloud result accumulates separately so a partially-streamed upgrade can
+  // never replace a complete local suggestion with half a sentence.
+  let cloudText = ''
 
   let firstToken = true
 
@@ -259,12 +304,19 @@ export async function triggerPrediction(): Promise<void> {
     ctx,
     (token) => {
       if (controller.signal.aborted) return
-      currentSuggestion += token
+      cloudText += token
 
       if (firstToken) {
         firstToken = false
-        log(`first token after ${Date.now() - t0}ms:`, JSON.stringify(token))
+        log(`cloud first token after ${Date.now() - t0}ms:`, JSON.stringify(token))
       }
+
+      // With a local suggestion already on screen, don't stream over it — a
+      // half-arrived cloud sentence is worse than a complete local one. Wait for
+      // the full result and swap once, in onDone.
+      if (useLocal && currentSuggestion) return
+
+      currentSuggestion = cloudText
 
       // Re-evaluate on every token: the display may only become possible once
       // the stream overtakes what the user has typed.
@@ -287,14 +339,39 @@ export async function triggerPrediction(): Promise<void> {
       }
     },
     () => {
+      streamController = null
+
+      // Upgrade a local suggestion to the cloud's, but only if it's still wanted
+      // and actually different — swapping identical text would just flicker.
+      if (useLocal && cloudText && cloudText !== currentSuggestion) {
+        if (!buffer.startsWith(requestedFrom)) {
+          log(`cloud done in ${Date.now() - t0}ms: not applied, buffer moved on`)
+          return
+        }
+        const previous = currentSuggestion
+        currentSuggestion = cloudText
+        const r = reconcile(requestedFrom, currentSuggestion, buffer)
+        if (r.state === 'show') {
+          showSuggestion(r.text)
+          if (!suggestionVisible) { suggestionVisible = true; registerTab() }
+          log(`upgraded after ${Date.now() - t0}ms: ${JSON.stringify(previous)} -> ${JSON.stringify(cloudText)}`)
+        } else {
+          // Cloud text doesn't fit what's been typed; keep what was showing
+          currentSuggestion = previous
+          log(`cloud done in ${Date.now() - t0}ms: kept local (${r.state})`)
+        }
+        return
+      }
+
       log(`done in ${Date.now() - t0}ms:`, JSON.stringify(currentSuggestion) +
           (suggestionVisible ? ' [SHOWING]' : ' [not shown]'))
-      streamController = null
     },
     (err) => {
       log('STREAM ERROR:', err.message)
-      clearSuggestion()
       streamController = null
+      // A local suggestion is still perfectly good — don't clear it because the
+      // network failed.
+      if (!(useLocal && currentSuggestion)) clearSuggestion()
     },
     controller.signal
   )

@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('glide', {
   closeWindow: () => ipcRenderer.send('window:close'),
   getAccentColor: () => ipcRenderer.invoke('system:accentColor'),
   testConnection: () => ipcRenderer.invoke('api:test') as Promise<{ ok: boolean; error?: string }>,
+  getLocalStatus: () =>
+    ipcRenderer.invoke('local:status') as Promise<{ status: string; detail: string }>,
   onSuggestionUpdate: (cb: (text: string) => void) =>
     ipcRenderer.on('suggestion:update', (_e, text) => cb(text)),
   onSuggestionAppend: (cb: (token: string) => void) =>

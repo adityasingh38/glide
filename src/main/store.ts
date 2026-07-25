@@ -20,6 +20,13 @@ export interface Settings {
    */
   userFacts: string
   theme: 'light' | 'dark'
+  /**
+   * Which engine answers a keystroke.
+   *  cloud  — Claude only (~850ms, best quality, sees the screen)
+   *  local  — on-device only (~30-76ms, no network, no vision)
+   *  hybrid — local answers instantly, Claude upgrades it if you linger
+   */
+  engine: 'cloud' | 'local' | 'hybrid'
 }
 
 const defaults: Settings = {
@@ -35,7 +42,8 @@ const defaults: Settings = {
   clipboardContext: false,
   screenContext: false,
   userFacts: '',
-  theme: 'dark'
+  theme: 'dark',
+  engine: 'hybrid'
 }
 
 /** Best-effort guess at the user's name so "my name is" works before they configure anything. */
