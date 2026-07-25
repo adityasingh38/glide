@@ -1,0 +1,13 @@
+appId: dev.cotypist.app
+productName: Cotypist
+directories:
+  output: release
+files:
+  - out/**/*
+win:
+  icon: build/icon.png
+  target: nsis
+  artifactName: ${productName}-Setup-${version}.exe
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
