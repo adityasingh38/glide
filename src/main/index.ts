@@ -67,11 +67,6 @@ app.whenReady().then(() => {
   createSuggestionWindow()
   startKeystrokeTracker()
 
-  globalShortcut.register('Ctrl+Space', () => {
-    const { enabled } = readSettings()
-    if (enabled) acceptSuggestion()
-  })
-
   globalShortcut.register('Ctrl+Shift+Space', () => {
     const { enabled } = readSettings()
     if (enabled) triggerPrediction()

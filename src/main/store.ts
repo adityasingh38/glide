@@ -17,7 +17,7 @@ const defaults: Settings = {
   enabled: true,
   apiKey: '',
   model: 'claude-haiku-4-5-20251001',
-  debounceMs: 800,
+  debounceMs: 0,
   maxTokens: 40,
   trigger: 'auto',
   clipboardContext: false,

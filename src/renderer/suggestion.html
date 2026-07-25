@@ -5,105 +5,62 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
-      width: 100vw; height: 100vh;
+      width: 100vw;
+      height: 100vh;
       background: transparent;
       overflow: hidden;
       pointer-events: none;
       user-select: none;
-    }
-
-    #pill {
-      display: inline-flex;
+      display: flex;
       align-items: center;
-      gap: 8px;
-      background: rgba(30, 30, 30, 0.88);
-      backdrop-filter: blur(24px) saturate(180%);
-      -webkit-backdrop-filter: blur(24px) saturate(180%);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 6px;
-      padding: 5px 8px 5px 10px;
-      max-width: 500px;
-      margin: 4px;
-      box-shadow:
-        0 8px 20px rgba(0, 0, 0, 0.28),
-        0 2px 6px rgba(0, 0, 0, 0.16),
-        inset 0 1px 0 rgba(255, 255, 255, 0.07);
     }
 
-    #text {
+    #ghost {
       font-family: 'Segoe UI', system-ui, sans-serif;
       font-size: 13px;
-      font-style: italic;
-      color: rgba(255, 255, 255, 0.45);
+      line-height: 1;
+      color: rgba(128, 128, 128, 0.65);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 370px;
+      flex: 1;
+      min-width: 0;
     }
 
-    #shortcut {
-      display: inline-flex;
-      align-items: center;
-      gap: 2px;
+    #hint {
       flex-shrink: 0;
-      opacity: 0.7;
-    }
-
-    .key {
+      margin-left: 6px;
       font-family: 'Segoe UI', system-ui, sans-serif;
-      font-size: 10px;
-      color: rgba(255, 255, 255, 0.45);
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.13);
-      border-bottom-width: 2px;
+      font-size: 9px;
+      color: rgba(128, 128, 128, 0.38);
+      background: rgba(128, 128, 128, 0.07);
+      border: 1px solid rgba(128, 128, 128, 0.14);
       border-radius: 3px;
-      padding: 1px 4px 0;
-      line-height: 1.5;
-    }
-
-    #dot {
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-      background: var(--accent, #0078d4);
-      flex-shrink: 0;
-      opacity: 0;
-      transition: opacity 0.2s;
-    }
-    #dot.active {
-      opacity: 1;
-      animation: pulse 1.4s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 0.4; transform: scale(1); }
-      50% { opacity: 1; transform: scale(1.15); }
+      padding: 1px 4px;
+      letter-spacing: 0.03em;
     }
   </style>
 </head>
 <body>
-  <div id="pill">
-    <div id="dot"></div>
-    <span id="text"></span>
-    <div id="shortcut">
-      <span class="key">Ctrl</span>
-      <span class="key">Space</span>
-    </div>
-  </div>
+  <span id="ghost"></span>
+  <span id="hint">Tab</span>
   <script>
-    const textEl = document.getElementById('text')
-    const dotEl = document.getElementById('dot')
+    const ghost = document.getElementById('ghost')
+    const hint = document.getElementById('hint')
 
-    window.glide?.onSuggestionUpdate((text) => {
-      textEl.textContent = text
-      if (text) {
-        dotEl.classList.add('active')
-      } else {
-        dotEl.classList.remove('active')
-      }
+    function setVisible(v) {
+      ghost.style.display = v ? '' : 'none'
+      hint.style.display = v ? '' : 'none'
+    }
+    setVisible(false)
+
+    window.glide?.onSuggestionUpdate(text => {
+      ghost.textContent = text
+      setVisible(!!text)
     })
-    window.glide?.onSuggestionAppend((token) => {
-      textEl.textContent += token
+    window.glide?.onSuggestionAppend(token => {
+      ghost.textContent += token
+      setVisible(true)
     })
   </script>
 </body>

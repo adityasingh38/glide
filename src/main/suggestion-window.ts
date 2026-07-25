@@ -36,23 +36,27 @@ function positionNearCaret(): void {
   const caret = getCaretScreenPos()
   const display = screen.getPrimaryDisplay()
   const { width: sw, height: sh } = display.bounds
+  const W = 460
 
-  let x: number
-  let y: number
+  let x: number, y: number, h: number
 
-  if (caret) {
-    // Below the caret line, offset right a touch
-    x = Math.min(caret.x + 4, sw - 504)
-    y = caret.y + caret.h + 4
-    // Flip above if too close to bottom
-    if (y + 52 > sh) y = caret.y - 52
+  if (caret && caret.h > 0) {
+    x = caret.x
+    y = caret.y
+    h = caret.h
   } else {
     // Fallback: bottom-center
-    x = Math.round(sw / 2) - 250
-    y = sh - 80
+    x = Math.round(sw / 2) - 230
+    y = sh - 60
+    h = 20
   }
 
-  win.setBounds({ x: Math.max(0, x), y: Math.max(0, y), width: 500, height: 48 })
+  win.setBounds({
+    x: Math.max(0, Math.min(x, sw - W)),
+    y: Math.max(0, Math.min(y, sh - h)),
+    width: W,
+    height: h
+  })
 }
 
 export function showSuggestion(text: string): void {

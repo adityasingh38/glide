@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { X, Eye, EyeOff, Key, Zap, Clock, Clipboard, Monitor, CheckCircle, XCircle, Loader } from 'lucide-react'
+import { X, Eye, EyeOff, Key, Zap, Clipboard, Monitor, CheckCircle, XCircle, Loader } from 'lucide-react'
 
 interface Settings {
   enabled: boolean
@@ -193,7 +193,7 @@ export default function App() {
           <div className="space-y-4">
             <SettingRow
               label="Trigger"
-              description="Auto predicts after you pause. Manual only on Ctrl+Shift+Space."
+              description="Auto predicts as you type. Manual only on Ctrl+Shift+Space."
               icon={<Key size={14} />}
               accent={accent}
             >
@@ -211,21 +211,6 @@ export default function App() {
                   </button>
                 ))}
               </div>
-            </SettingRow>
-
-            <SettingRow
-              label={`Debounce — ${s.debounceMs}ms`}
-              description="Pause after typing before a prediction fires."
-              icon={<Clock size={14} />}
-              accent={accent}
-            >
-              <input
-                type="range" min={300} max={2000} step={100}
-                value={s.debounceMs}
-                onChange={e => update({ debounceMs: parseInt(e.target.value) })}
-                className="w-24 shrink-0"
-                disabled={s.trigger === 'manual'}
-              />
             </SettingRow>
 
             <SettingRow
@@ -276,7 +261,7 @@ export default function App() {
 
         <Card>
           <div className="space-y-2">
-            <Hotkey keys={['Ctrl', 'Space']} label="Accept suggestion" />
+            <Hotkey keys={['Tab']} label="Accept suggestion" />
             <Hotkey keys={['Ctrl', 'Shift', 'Space']} label="Trigger manually" />
             <Hotkey keys={['Esc']} label="Dismiss" />
           </div>

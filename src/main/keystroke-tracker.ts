@@ -1,16 +1,31 @@
 import { uIOhook, UiohookKey } from 'uiohook-napi'
+import { globalShortcut, clipboard } from 'electron'
 import { streamCompletion, type CompletionContext } from './claude-client'
 import { showSuggestion, appendSuggestion, hideSuggestion, captureScreen } from './suggestion-window'
 import { readSettings } from './store'
-import { clipboard } from 'electron'
 import { sendCtrlV, getActiveWindowTitle } from './win32'
 
-// Rolling text buffer — tracks what the user has typed since last reset
 let buffer = ''
-let debounceTimer: ReturnType<typeof setTimeout> | null = null
 let streamController: AbortController | null = null
 let currentSuggestion = ''
 let suggestionVisible = false
+let tabRegistered = false
+
+function registerTab(): void {
+  if (tabRegistered) return
+  try {
+    globalShortcut.register('Tab', () => acceptSuggestion())
+    tabRegistered = true
+  } catch {}
+}
+
+function unregisterTab(): void {
+  if (!tabRegistered) return
+  try {
+    globalShortcut.unregister('Tab')
+    tabRegistered = false
+  } catch {}
+}
 
 // Map UiohookKey codes to printable chars (shift-aware for common keys)
 function keycodeToChar(keycode: number, shift: boolean): string {
@@ -62,6 +77,7 @@ function resetBuffer(reason?: string): void {
   hideSuggestion()
   suggestionVisible = false
   currentSuggestion = ''
+  unregisterTab()
 }
 
 function cancelStream(): void {
@@ -69,26 +85,11 @@ function cancelStream(): void {
     streamController.abort()
     streamController = null
   }
-  if (debounceTimer) {
-    clearTimeout(debounceTimer)
-    debounceTimer = null
-  }
-}
-
-function schedulePrediction(): void {
-  cancelStream()
-  const { debounceMs, enabled, trigger } = readSettings()
-  if (!enabled || trigger === 'manual') return
-  if (buffer.trim().length < 6) return  // need at least a few chars
-
-  debounceTimer = setTimeout(() => {
-    triggerPrediction()
-  }, debounceMs)
 }
 
 export async function triggerPrediction(): Promise<void> {
   cancelStream()
-  if (buffer.trim().length < 3) return
+  if (buffer.trim().length < 2) return
 
   const { clipboardContext, screenContext } = readSettings()
   const ctx: CompletionContext = {}
@@ -118,6 +119,7 @@ export async function triggerPrediction(): Promise<void> {
         firstToken = false
         showSuggestion(token)
         suggestionVisible = true
+        registerTab()
       } else {
         appendSuggestion(token)
       }
@@ -127,11 +129,11 @@ export async function triggerPrediction(): Promise<void> {
       console.error('[glide] stream error:', err.message)
       hideSuggestion()
       suggestionVisible = false
+      unregisterTab()
     },
     controller.signal
   )
 }
-
 
 export function acceptSuggestion(): void {
   if (!suggestionVisible || !currentSuggestion) return
@@ -140,10 +142,10 @@ export function acceptSuggestion(): void {
   suggestionVisible = false
   currentSuggestion = ''
   cancelStream()
+  unregisterTab()
 
   // Inject via clipboard swap
   const prev = clipboard.readText()
-  // Add a leading space if buffer doesn't end with whitespace
   const inject = /\s$/.test(buffer) ? text : ` ${text}`
   buffer += inject
   clipboard.writeText(inject)
@@ -156,6 +158,7 @@ export function dismissSuggestion(): void {
   hideSuggestion()
   suggestionVisible = false
   currentSuggestion = ''
+  unregisterTab()
 }
 
 export function startKeystrokeTracker(): void {
@@ -164,53 +167,54 @@ export function startKeystrokeTracker(): void {
 
     // Ctrl/Alt combos — most are destructive to buffer context
     if (ctrlKey || altKey || metaKey) {
-      // Ctrl+Z/Y (undo/redo), Ctrl+X (cut) invalidate our buffer
       if (ctrlKey && (keycode === UiohookKey.Z || keycode === UiohookKey.Y || keycode === UiohookKey.X)) {
         resetBuffer('ctrl+z/y/x')
       }
-      // Ctrl+V — user pasted something; hard to track, so just reset
       if (ctrlKey && keycode === UiohookKey.V) {
-        // Only reset if it's a real user paste (not our own injection).
-        // We detect our own paste by checking the flag set in acceptSuggestion.
-        // Simple approach: reset with a short delay so our SendInput Ctrl+V is ignored
         setTimeout(() => resetBuffer('paste'), 100)
       }
       return
     }
 
-    // Dismiss on any key while suggestion is showing (before checking what the key is)
+    // Dismiss on any key while suggestion is showing
+    // Tab is excluded — globalShortcut handles acceptance
     if (suggestionVisible &&
         keycode !== UiohookKey.Escape &&
         keycode !== UiohookKey.Ctrl &&
-        keycode !== UiohookKey.Shift) {
+        keycode !== UiohookKey.Shift &&
+        keycode !== UiohookKey.Tab) {
       cancelStream()
       hideSuggestion()
       suggestionVisible = false
       currentSuggestion = ''
+      unregisterTab()
       // Don't return — still want to add the char to buffer
     }
 
     switch (keycode) {
       case UiohookKey.Backspace:
         buffer = buffer.slice(0, -1)
-        schedulePrediction()
+        triggerPrediction()
         return
 
       case UiohookKey.Delete:
-        // Delete mid-text — hard to track position, reset
         resetBuffer('delete')
         return
 
       case UiohookKey.Enter:
         buffer += '\n'
-        schedulePrediction()
+        triggerPrediction()
         return
 
       case UiohookKey.Escape:
         dismissSuggestion()
         return
 
-      // Arrow keys / Home / End / PgUp/Dn mean cursor moved — buffer is stale
+      case UiohookKey.Tab:
+        // When suggestion is visible, globalShortcut.register('Tab') handles acceptance.
+        // When no suggestion, Tab goes through to the app as normal (we just don't update buffer).
+        return
+
       case UiohookKey.ArrowLeft:
       case UiohookKey.ArrowRight:
       case UiohookKey.ArrowUp:
@@ -221,19 +225,16 @@ export function startKeystrokeTracker(): void {
       case UiohookKey.PageDown:
         resetBuffer('navigation')
         return
-
-      // Tab — allow it to reach the app; just dismiss
-      case UiohookKey.Tab:
-        dismissSuggestion()
-        return
     }
 
     const char = keycodeToChar(keycode, shiftKey)
     if (char) {
       buffer += char
-      // Keep buffer from growing unbounded
       if (buffer.length > 800) buffer = buffer.slice(-600)
-      schedulePrediction()
+      const { enabled, trigger } = readSettings()
+      if (enabled && trigger !== 'manual') {
+        triggerPrediction()
+      }
     }
   })
 
@@ -243,4 +244,5 @@ export function startKeystrokeTracker(): void {
 export function stopKeystrokeTracker(): void {
   uIOhook.stop()
   cancelStream()
+  unregisterTab()
 }
