@@ -30,6 +30,23 @@ Rules:
 - If the context is code, complete code; if prose, complete prose
 - If clipboard content, a screenshot, or app context is provided, use it to infer the user's intent`
 
+export async function testConnection(): Promise<{ ok: boolean; error?: string }> {
+  const { apiKey, model } = readSettings()
+  if (!apiKey) return { ok: false, error: 'No API key set' }
+  try {
+    const c = new Anthropic({ apiKey })
+    await c.messages.create({
+      model,
+      max_tokens: 1,
+      messages: [{ role: 'user', content: 'Hi' }]
+    })
+    return { ok: true }
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, error: msg }
+  }
+}
+
 export async function streamCompletion(
   buffer: string,
   context: CompletionContext,

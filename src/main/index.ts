@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { createSuggestionWindow } from './suggestion-window'
 import { startKeystrokeTracker, stopKeystrokeTracker, acceptSuggestion, dismissSuggestion, triggerPrediction } from './keystroke-tracker'
 import { readSettings, writeSettings } from './store'
+import { testConnection } from './claude-client'
 import type { Settings } from './store'
 
 let tray: Tray | null = null
@@ -101,6 +102,7 @@ app.whenReady().then(() => {
     }
   })
   ipcMain.on('window:close', () => settingsWin?.close())
+  ipcMain.handle('api:test', () => testConnection())
 })
 
 app.on('will-quit', () => {

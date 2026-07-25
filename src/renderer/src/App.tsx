@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { X, Eye, EyeOff, Key, Zap, Clock, Clipboard, Monitor } from 'lucide-react'
+import { useEffect, useState, useRef } from 'react'
+import { X, Eye, EyeOff, Key, Zap, Clock, Clipboard, Monitor, CheckCircle, XCircle, Loader } from 'lucide-react'
 
 interface Settings {
   enabled: boolean
@@ -19,6 +19,7 @@ declare global {
       setSettings: (patch: Partial<Settings>) => Promise<void>
       closeWindow: () => void
       getAccentColor: () => Promise<string>
+      testConnection: () => Promise<{ ok: boolean; error?: string }>
       onSuggestionUpdate: (cb: (text: string) => void) => void
       onSuggestionAppend: (cb: (token: string) => void) => void
     }
@@ -35,6 +36,10 @@ export default function App() {
   const [s, setS] = useState<Settings | null>(null)
   const [showKey, setShowKey] = useState(false)
   const [accent, setAccent] = useState('#0078d4')
+  const [testStatus, setTestStatus] = useState<'idle' | 'loading' | 'ok' | 'err'>('idle')
+  const [testError, setTestError] = useState('')
+  const [saved, setSaved] = useState(false)
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     window.glide.getSettings().then(setS)
@@ -48,6 +53,23 @@ export default function App() {
     if (!s) return
     setS(prev => ({ ...prev!, ...patch }))
     await window.glide.setSettings(patch)
+    // Flash "Saved" indicator
+    setSaved(true)
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => setSaved(false), 1500)
+  }
+
+  async function runTest() {
+    setTestStatus('loading')
+    setTestError('')
+    const result = await window.glide.testConnection()
+    if (result.ok) {
+      setTestStatus('ok')
+      setTimeout(() => setTestStatus('idle'), 3000)
+    } else {
+      setTestStatus('err')
+      setTestError(result.error ?? 'Unknown error')
+    }
   }
 
   if (!s) return (
@@ -64,9 +86,17 @@ export default function App() {
         className="flex items-center justify-between pl-4 pr-1 h-10 shrink-0"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
-        <span className="text-[13px] font-semibold tracking-tight" style={{ color: 'rgba(255,255,255,0.85)' }}>
-          Glide
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[13px] font-semibold tracking-tight" style={{ color: 'rgba(255,255,255,0.85)' }}>
+            Glide
+          </span>
+          <span
+            className="text-[11px] transition-opacity duration-300"
+            style={{ color: 'rgba(255,255,255,0.4)', opacity: saved ? 1 : 0 }}
+          >
+            Saved ✓
+          </span>
+        </div>
         <button
           className="w-8 h-8 flex items-center justify-center rounded transition-colors cursor-pointer group"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
@@ -115,9 +145,34 @@ export default function App() {
                   {showKey ? <EyeOff size={12} /> : <Eye size={12} />}
                 </button>
               </div>
-              <p className="text-[11px] mt-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                Get one at <span style={{ color: accent }}>console.anthropic.com</span>
-              </p>
+              <div className="flex items-center justify-between mt-1.5">
+                <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                  Get one at <span style={{ color: accent }}>console.anthropic.com</span>
+                </p>
+                <button
+                  onClick={runTest}
+                  disabled={testStatus === 'loading' || !s.apiKey}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] cursor-pointer transition-all disabled:opacity-40"
+                  style={{
+                    background: testStatus === 'ok' ? 'rgba(34,197,94,0.15)' : testStatus === 'err' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.08)',
+                    border: `1px solid ${testStatus === 'ok' ? 'rgba(34,197,94,0.3)' : testStatus === 'err' ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.12)'}`,
+                    color: testStatus === 'ok' ? 'rgb(134,239,172)' : testStatus === 'err' ? 'rgb(252,165,165)' : 'rgba(255,255,255,0.6)'
+                  }}
+                >
+                  {testStatus === 'loading' && <Loader size={10} className="animate-spin" />}
+                  {testStatus === 'ok' && <CheckCircle size={10} />}
+                  {testStatus === 'err' && <XCircle size={10} />}
+                  {testStatus === 'idle' && 'Test'}
+                  {testStatus === 'loading' && 'Testing…'}
+                  {testStatus === 'ok' && 'Connected'}
+                  {testStatus === 'err' && 'Failed'}
+                </button>
+              </div>
+              {testStatus === 'err' && testError && (
+                <p className="text-[10px] mt-1 leading-relaxed" style={{ color: 'rgba(252,165,165,0.8)' }}>
+                  {testError.length > 120 ? testError.slice(0, 120) + '…' : testError}
+                </p>
+              )}
             </div>
 
             <div>
