@@ -1,7 +1,7 @@
 {
-  "name": "cotypist",
+  "name": "glide",
   "version": "0.1.0",
-  "description": "Cotypist — system-wide AI inline autocomplete for Windows",
+  "description": "Glide — system-wide AI inline autocomplete for Windows",
   "private": true,
   "license": "MIT",
   "author": "Aditya Singh",

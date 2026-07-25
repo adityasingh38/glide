@@ -63,11 +63,11 @@
     const textEl = document.getElementById('text')
     const dotEl = document.getElementById('dot')
 
-    window.cotypist?.onSuggestionUpdate((text) => {
+    window.glide?.onSuggestionUpdate((text) => {
       textEl.textContent = text
       dotEl.style.animation = text ? 'pulse 1.2s ease-in-out infinite' : 'none'
     })
-    window.cotypist?.onSuggestionAppend((token) => {
+    window.glide?.onSuggestionAppend((token) => {
       textEl.textContent += token
     })
   </script>

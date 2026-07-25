@@ -50,7 +50,7 @@ function buildTrayMenu(): Menu {
     },
     { label: 'Settings…', click: createSettingsWindow },
     { type: 'separator' },
-    { label: 'Quit Cotypist', role: 'quit' }
+    { label: 'Quit Glide', role: 'quit' }
   ])
 }
 
@@ -81,7 +81,7 @@ app.whenReady().then(() => {
   const icon = rawIcon.isEmpty() ? nativeImage.createEmpty() : rawIcon
 
   tray = new Tray(icon)
-  tray.setToolTip('Cotypist')
+  tray.setToolTip('Glide')
   tray.setContextMenu(buildTrayMenu())
   tray.on('click', () => tray?.popUpContextMenu())
 

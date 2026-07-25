@@ -12,7 +12,7 @@ interface Settings {
 
 declare global {
   interface Window {
-    cotypist: {
+    glide: {
       getSettings: () => Promise<Settings>
       setSettings: (patch: Partial<Settings>) => Promise<void>
       closeWindow: () => void
@@ -30,12 +30,12 @@ export default function App() {
   const [s, setS] = useState<Settings | null>(null)
   const [showKey, setShowKey] = useState(false)
 
-  useEffect(() => { window.cotypist.getSettings().then(setS) }, [])
+  useEffect(() => { window.glide.getSettings().then(setS) }, [])
 
   async function update(patch: Partial<Settings>) {
     if (!s) return
     setS(prev => ({ ...prev!, ...patch }))
-    await window.cotypist.setSettings(patch)
+    await window.glide.setSettings(patch)
   }
 
   if (!s) return (
@@ -53,13 +53,13 @@ export default function App() {
       >
         <div className="flex items-center gap-2.5">
           <div className="w-1.5 h-1.5 rounded-full bg-violet-500" />
-          <span className="text-sm font-semibold">Cotypist</span>
+          <span className="text-sm font-semibold">Glide</span>
           <span className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-1.5 py-0.5 rounded">v0.1</span>
         </div>
         <button
           className="text-zinc-600 hover:text-zinc-300 transition-colors cursor-pointer"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-          onClick={() => window.cotypist.closeWindow()}
+          onClick={() => window.glide.closeWindow()}
         >
           <X size={13} />
         </button>
@@ -69,7 +69,7 @@ export default function App() {
 
         {/* Enable */}
         <Card>
-          <Row label="Enable Cotypist" icon={<Zap size={13} />}>
+          <Row label="Enable Glide" icon={<Zap size={13} />}>
             <Toggle checked={s.enabled} onChange={v => update({ enabled: v })} />
           </Row>
         </Card>
@@ -170,7 +170,7 @@ export default function App() {
       </div>
 
       <div className="px-4 py-2.5 border-t border-zinc-800 text-[11px] text-zinc-600 flex justify-between">
-        <span>Cotypist · tray app</span>
+        <span>Glide · tray app</span>
         <span>adityasingh38</span>
       </div>
     </div>

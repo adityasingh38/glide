@@ -1,10 +1,10 @@
-# Cotypist
+# Glide
 
 System-wide AI inline autocomplete for Windows — ghost text suggestions as you type in any app, powered by Claude.
 
 ## How it works
 
-Cotypist runs as a system tray app and watches what you type globally (via `uiohook-napi`). After a short pause it requests a completion from the Claude API. The suggestion appears as ghost text near your cursor. Press `Ctrl+Space` to accept it — the text is injected via clipboard swap, so it works in any application.
+Glide runs as a system tray app and watches what you type globally (via `uiohook-napi`). After a short pause it requests a completion from the Claude API. The suggestion appears as ghost text near your cursor. Press `Ctrl+Space` to accept it — the text is injected via clipboard swap, so it works in any application.
 
 ## Hotkeys
 

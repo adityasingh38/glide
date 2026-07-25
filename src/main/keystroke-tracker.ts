@@ -56,7 +56,7 @@ function keycodeToChar(keycode: number, shift: boolean): string {
 }
 
 function resetBuffer(reason?: string): void {
-  if (reason) console.log('[cotypist] buffer reset:', reason)
+  if (reason) console.log('[glide] buffer reset:', reason)
   buffer = ''
   cancelStream()
   hideSuggestion()
@@ -110,7 +110,7 @@ export function triggerPrediction(): void {
     },
     () => { /* done */ },
     (err) => {
-      console.error('[cotypist] stream error:', err.message)
+      console.error('[glide] stream error:', err.message)
       hideSuggestion()
       suggestionVisible = false
     },

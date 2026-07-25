@@ -1,5 +1,5 @@
-appId: dev.cotypist.app
-productName: Cotypist
+appId: dev.glide.app
+productName: Glide
 directories:
   output: release
 files:
