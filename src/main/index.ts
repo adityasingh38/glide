@@ -16,7 +16,7 @@ function createSettingsWindow(): void {
   }
   settingsWin = new BrowserWindow({
     width: 460,
-    height: 580,
+    height: 640,
     resizable: false,
     frame: false,
     show: false,

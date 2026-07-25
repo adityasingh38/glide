@@ -6,11 +6,15 @@ import { readSettings } from './store'
 import { sendCtrlV, getActiveWindowTitle, getForegroundHwnd } from './win32'
 
 let buffer = ''
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
 let streamController: AbortController | null = null
 let currentSuggestion = ''
 let suggestionVisible = false
 let tabRegistered = false
 let lastHwnd: unknown = null
+
+// Minimum pause before firing a prediction — lets the API return before next cancel
+const DEBOUNCE_MS = 280
 
 function registerTab(): void {
   if (tabRegistered) return
@@ -83,10 +87,8 @@ function resetBuffer(reason?: string): void {
 }
 
 function cancelStream(): void {
-  if (streamController) {
-    streamController.abort()
-    streamController = null
-  }
+  if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
+  if (streamController) { streamController.abort(); streamController = null }
 }
 
 export async function triggerPrediction(): Promise<void> {
@@ -203,7 +205,8 @@ export function startKeystrokeTracker(): void {
     switch (keycode) {
       case UiohookKey.Backspace:
         buffer = buffer.slice(0, -1)
-        triggerPrediction()
+        cancelStream()
+        debounceTimer = setTimeout(() => triggerPrediction(), DEBOUNCE_MS)
         return
 
       case UiohookKey.Delete:
@@ -212,7 +215,8 @@ export function startKeystrokeTracker(): void {
 
       case UiohookKey.Enter:
         buffer += '\n'
-        triggerPrediction()
+        cancelStream()
+        debounceTimer = setTimeout(() => triggerPrediction(), DEBOUNCE_MS)
         return
 
       case UiohookKey.Escape:
@@ -242,7 +246,8 @@ export function startKeystrokeTracker(): void {
       if (buffer.length > 800) buffer = buffer.slice(-600)
       const { enabled, trigger } = readSettings()
       if (enabled && trigger !== 'manual') {
-        triggerPrediction()
+        cancelStream()
+        debounceTimer = setTimeout(() => triggerPrediction(), DEBOUNCE_MS)
       }
     }
   })

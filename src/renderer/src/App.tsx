@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { X, Eye, EyeOff, Key, Zap, Clipboard, Monitor, CheckCircle, XCircle, Loader } from 'lucide-react'
+import { X, Eye, EyeOff, Zap, Clipboard, Monitor, CheckCircle, XCircle, Loader, ChevronDown } from 'lucide-react'
 
 interface Settings {
   enabled: boolean
@@ -27,9 +27,9 @@ declare global {
 }
 
 const MODELS = [
-  { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 — fastest, cheapest' },
-  { id: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5 — smarter' },
-  { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 — best' },
+  { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
+  { id: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' },
+  { id: 'claude-sonnet-5', label: 'Claude Sonnet 5' },
 ]
 
 export default function App() {
@@ -53,10 +53,9 @@ export default function App() {
     if (!s) return
     setS(prev => ({ ...prev!, ...patch }))
     await window.glide.setSettings(patch)
-    // Flash "Saved" indicator
     setSaved(true)
     if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => setSaved(false), 1500)
+    saveTimer.current = setTimeout(() => setSaved(false), 1400)
   }
 
   async function runTest() {
@@ -65,7 +64,7 @@ export default function App() {
     const result = await window.glide.testConnection()
     if (result.ok) {
       setTestStatus('ok')
-      setTimeout(() => setTestStatus('idle'), 3000)
+      setTimeout(() => setTestStatus('idle'), 4000)
     } else {
       setTestStatus('err')
       setTestError(result.error ?? 'Unknown error')
@@ -74,255 +73,241 @@ export default function App() {
 
   if (!s) return (
     <div className="flex h-screen items-center justify-center">
-      <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: accent }} />
+      <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: accent }} />
     </div>
   )
 
   return (
-    <div className="flex flex-col h-screen" style={{ background: 'rgba(30,30,30,0.82)' }}>
+    <div className="flex flex-col h-screen select-none" style={{ background: 'rgba(22,22,22,0.86)' }}>
 
       {/* Title bar */}
       <div
-        className="flex items-center justify-between pl-4 pr-1 h-10 shrink-0"
-        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+        className="flex items-center justify-between px-4 shrink-0"
+        style={{ height: 44, WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
-        <div className="flex items-center gap-2">
-          <span className="text-[13px] font-semibold tracking-tight" style={{ color: 'rgba(255,255,255,0.85)' }}>
+        <div className="flex items-center gap-2.5">
+          <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: accent }}>
+            <Zap size={11} color="#fff" strokeWidth={2.5} />
+          </div>
+          <span className="text-[13px] font-semibold" style={{ color: 'rgba(255,255,255,0.9)', letterSpacing: '-0.01em' }}>
             Glide
           </span>
           <span
             className="text-[11px] transition-opacity duration-300"
-            style={{ color: 'rgba(255,255,255,0.4)', opacity: saved ? 1 : 0 }}
+            style={{ color: 'rgba(255,255,255,0.35)', opacity: saved ? 1 : 0 }}
           >
-            Saved ✓
+            saved
           </span>
         </div>
         <button
-          className="w-8 h-8 flex items-center justify-center rounded transition-colors cursor-pointer group"
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          className="w-7 h-7 flex items-center justify-center rounded-md transition-colors cursor-pointer"
+          style={{ WebkitAppRegion: 'no-drag', color: 'rgba(255,255,255,0.35)' } as React.CSSProperties}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,80,80,0.18)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           onClick={() => window.glide.closeWindow()}
         >
-          <X size={12} className="text-white/40 group-hover:text-white transition-colors" />
+          <X size={13} />
         </button>
       </div>
 
-      {/* Thin separator */}
-      <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', flexShrink: 0 }} />
+      <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-2" style={{ scrollbarWidth: 'none' }}>
 
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5">
-
-        {/* Enable */}
-        <SettingRow
-          label="Enable Glide"
-          icon={<Zap size={14} />}
-          accent={accent}
-        >
+        {/* Enable card */}
+        <div className="rounded-xl px-4 py-3 flex items-center justify-between"
+          style={{ background: s.enabled ? `${accent}18` : 'rgba(255,255,255,0.04)', border: `1px solid ${s.enabled ? `${accent}30` : 'rgba(255,255,255,0.07)'}` }}>
+          <div>
+            <p className="text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.9)' }}>Enable Glide</p>
+            <p className="text-[11px] mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              {s.enabled ? 'Predicting as you type' : 'Paused — no predictions'}
+            </p>
+          </div>
           <Toggle checked={s.enabled} onChange={v => update({ enabled: v })} accent={accent} />
-        </SettingRow>
+        </div>
 
-        <Divider />
+        {/* API card */}
+        <Section label="Claude API">
+          {/* Key input */}
+          <div className="relative">
+            <input
+              type={showKey ? 'text' : 'password'}
+              value={s.apiKey}
+              onChange={e => update({ apiKey: e.target.value })}
+              placeholder="sk-ant-api03-…"
+              className="w-full pr-8"
+            />
+            <button
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer"
+              style={{ color: 'rgba(255,255,255,0.3)' }}
+              onClick={() => setShowKey(v => !v)}
+            >
+              {showKey ? <EyeOff size={13} /> : <Eye size={13} />}
+            </button>
+          </div>
 
-        {/* API Key */}
-        <SectionLabel>Claude API</SectionLabel>
+          {/* Model selector */}
+          <div className="relative mt-2">
+            <select
+              value={s.model}
+              onChange={e => update({ model: e.target.value })}
+              className="w-full appearance-none pr-8"
+            >
+              {MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+            </select>
+            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'rgba(255,255,255,0.3)' }} />
+          </div>
 
-        <Card>
-          <div className="space-y-3">
+          {/* Test connection */}
+          <div className="flex items-center gap-2 mt-2.5">
+            <button
+              onClick={runTest}
+              disabled={testStatus === 'loading' || !s.apiKey}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-medium cursor-pointer transition-all disabled:opacity-40"
+              style={{
+                background: testStatus === 'ok' ? 'rgba(34,197,94,0.12)' : testStatus === 'err' ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.07)',
+                border: `1px solid ${testStatus === 'ok' ? 'rgba(34,197,94,0.25)' : testStatus === 'err' ? 'rgba(239,68,68,0.25)' : 'rgba(255,255,255,0.1)'}`,
+                color: testStatus === 'ok' ? 'rgb(134,239,172)' : testStatus === 'err' ? 'rgb(252,165,165)' : 'rgba(255,255,255,0.55)'
+              }}
+            >
+              {testStatus === 'loading' && <Loader size={11} className="animate-spin" />}
+              {testStatus === 'ok' && <CheckCircle size={11} />}
+              {testStatus === 'err' && <XCircle size={11} />}
+              <span>
+                {testStatus === 'idle' && 'Test connection'}
+                {testStatus === 'loading' && 'Connecting…'}
+                {testStatus === 'ok' && 'Connected'}
+                {testStatus === 'err' && 'Failed'}
+              </span>
+            </button>
+            {!s.apiKey && (
+              <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.25)' }}>
+                Get a key at <span style={{ color: accent }}>console.anthropic.com</span>
+              </span>
+            )}
+          </div>
+          {testStatus === 'err' && testError && (
+            <p className="text-[11px] mt-1.5 leading-relaxed" style={{ color: 'rgba(252,165,165,0.75)' }}>
+              {testError.length > 100 ? testError.slice(0, 100) + '…' : testError}
+            </p>
+          )}
+        </Section>
+
+        {/* Context card */}
+        <Section label="Context">
+          <ContextRow
+            icon={<Clipboard size={13} />}
+            label="Clipboard"
+            desc="Read clipboard before each prediction"
+            checked={s.clipboardContext}
+            onChange={v => update({ clipboardContext: v })}
+            accent={accent}
+          />
+          <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '10px 0' }} />
+          <ContextRow
+            icon={<Monitor size={13} />}
+            label="Screen"
+            desc="Capture screen for context"
+            checked={s.screenContext}
+            onChange={v => update({ screenContext: v })}
+            accent={accent}
+          />
+        </Section>
+
+        {/* Behaviour card */}
+        <Section label="Behaviour">
+          {/* Trigger */}
+          <div className="flex items-center justify-between">
             <div>
-              <label className="block text-[11px] mb-1.5" style={{ color: 'rgba(255,255,255,0.45)' }}>API Key</label>
-              <div className="relative">
-                <input
-                  type={showKey ? 'text' : 'password'}
-                  value={s.apiKey}
-                  onChange={e => update({ apiKey: e.target.value })}
-                  placeholder="sk-ant-…"
-                  className="pr-8"
-                />
-                <button
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer transition-colors"
-                  style={{ color: 'rgba(255,255,255,0.35)' }}
-                  onClick={() => setShowKey(v => !v)}
-                >
-                  {showKey ? <EyeOff size={12} /> : <Eye size={12} />}
-                </button>
-              </div>
-              <div className="flex items-center justify-between mt-1.5">
-                <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                  Get one at <span style={{ color: accent }}>console.anthropic.com</span>
-                </p>
-                <button
-                  onClick={runTest}
-                  disabled={testStatus === 'loading' || !s.apiKey}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] cursor-pointer transition-all disabled:opacity-40"
-                  style={{
-                    background: testStatus === 'ok' ? 'rgba(34,197,94,0.15)' : testStatus === 'err' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.08)',
-                    border: `1px solid ${testStatus === 'ok' ? 'rgba(34,197,94,0.3)' : testStatus === 'err' ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.12)'}`,
-                    color: testStatus === 'ok' ? 'rgb(134,239,172)' : testStatus === 'err' ? 'rgb(252,165,165)' : 'rgba(255,255,255,0.6)'
-                  }}
-                >
-                  {testStatus === 'loading' && <Loader size={10} className="animate-spin" />}
-                  {testStatus === 'ok' && <CheckCircle size={10} />}
-                  {testStatus === 'err' && <XCircle size={10} />}
-                  {testStatus === 'idle' && 'Test'}
-                  {testStatus === 'loading' && 'Testing…'}
-                  {testStatus === 'ok' && 'Connected'}
-                  {testStatus === 'err' && 'Failed'}
-                </button>
-              </div>
-              {testStatus === 'err' && testError && (
-                <p className="text-[10px] mt-1 leading-relaxed" style={{ color: 'rgba(252,165,165,0.8)' }}>
-                  {testError.length > 120 ? testError.slice(0, 120) + '…' : testError}
-                </p>
-              )}
+              <p className="text-[13px]" style={{ color: 'rgba(255,255,255,0.85)' }}>Trigger</p>
+              <p className="text-[11px] mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                {s.trigger === 'auto' ? 'Predicts while you type' : 'Manual — Ctrl+Shift+Space'}
+              </p>
             </div>
+            <div className="flex text-[12px] rounded-lg overflow-hidden shrink-0" style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
+              {(['auto', 'manual'] as const).map(t => (
+                <button
+                  key={t}
+                  onClick={() => update({ trigger: t })}
+                  className="px-3 py-1.5 capitalize cursor-pointer font-medium transition-colors"
+                  style={s.trigger === t
+                    ? { background: accent, color: '#fff' }
+                    : { color: 'rgba(255,255,255,0.4)', background: 'transparent' }}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
 
+          <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '12px 0' }} />
+
+          {/* Max tokens */}
+          <div className="flex items-center justify-between gap-4">
             <div>
-              <label className="block text-[11px] mb-1.5" style={{ color: 'rgba(255,255,255,0.45)' }}>Model</label>
-              <select value={s.model} onChange={e => update({ model: e.target.value })}>
-                {MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
-              </select>
+              <p className="text-[13px]" style={{ color: 'rgba(255,255,255,0.85)' }}>Length</p>
+              <p className="text-[11px] mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>{s.maxTokens} tokens max</p>
             </div>
+            <input
+              type="range" min={10} max={80} step={5}
+              value={s.maxTokens}
+              onChange={e => update({ maxTokens: parseInt(e.target.value) })}
+              className="w-28 shrink-0"
+            />
           </div>
-        </Card>
-
-        <Divider />
-
-        {/* Behaviour */}
-        <SectionLabel>Behaviour</SectionLabel>
-
-        <Card>
-          <div className="space-y-4">
-            <SettingRow
-              label="Trigger"
-              description="Auto predicts as you type. Manual only on Ctrl+Shift+Space."
-              icon={<Key size={14} />}
-              accent={accent}
-            >
-              <div className="flex rounded-md overflow-hidden text-[12px] shrink-0" style={{ border: '1px solid rgba(255,255,255,0.12)' }}>
-                {(['auto', 'manual'] as const).map(t => (
-                  <button
-                    key={t}
-                    onClick={() => update({ trigger: t })}
-                    className="px-3 py-1 capitalize cursor-pointer transition-colors"
-                    style={s.trigger === t
-                      ? { background: accent, color: '#fff' }
-                      : { color: 'rgba(255,255,255,0.45)' }}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </SettingRow>
-
-            <SettingRow
-              label={`Max tokens — ${s.maxTokens}`}
-              description="Longer completions take more time."
-              accent={accent}
-            >
-              <input
-                type="range" min={10} max={80} step={5}
-                value={s.maxTokens}
-                onChange={e => update({ maxTokens: parseInt(e.target.value) })}
-                className="w-24 shrink-0"
-              />
-            </SettingRow>
-          </div>
-        </Card>
-
-        <Divider />
-
-        {/* Context */}
-        <SectionLabel>Context</SectionLabel>
-
-        <Card>
-          <div className="space-y-4">
-            <SettingRow
-              label="Clipboard Context"
-              description="Reads your clipboard before each prediction."
-              icon={<Clipboard size={14} />}
-              accent={accent}
-            >
-              <Toggle checked={s.clipboardContext} onChange={v => update({ clipboardContext: v })} accent={accent} />
-            </SettingRow>
-            <SettingRow
-              label="Screen Context"
-              description="Captures your screen so Glide sees what you're looking at."
-              icon={<Monitor size={14} />}
-              accent={accent}
-            >
-              <Toggle checked={s.screenContext} onChange={v => update({ screenContext: v })} accent={accent} />
-            </SettingRow>
-          </div>
-        </Card>
-
-        <Divider />
+        </Section>
 
         {/* Hotkeys */}
-        <SectionLabel>Hotkeys</SectionLabel>
-
-        <Card>
+        <div className="px-1 pt-1">
+          <p className="text-[11px] mb-2 font-medium uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.25)' }}>Hotkeys</p>
           <div className="space-y-2">
-            <Hotkey keys={['Tab']} label="Accept suggestion" />
-            <Hotkey keys={['Ctrl', 'Shift', 'Space']} label="Trigger manually" />
-            <Hotkey keys={['Esc']} label="Dismiss" />
+            <HotkeyRow label="Accept suggestion" keys={['Tab']} />
+            <HotkeyRow label="Trigger manually" keys={['Ctrl', 'Shift', 'Space']} />
+            <HotkeyRow label="Dismiss" keys={['Esc']} />
           </div>
-        </Card>
+        </div>
 
       </div>
 
       {/* Footer */}
-      <div
-        className="px-4 py-2 flex justify-between shrink-0"
-        style={{ borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: 11, color: 'rgba(255,255,255,0.25)' }}
-      >
-        <span>Glide · tray app</span>
-        <span>adityasingh38</span>
+      <div className="px-4 py-2.5 flex items-center justify-between shrink-0"
+        style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.2)' }}>Glide · tray app</span>
+        <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.2)' }}>adityasingh38</span>
       </div>
     </div>
   )
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <p className="px-1 pt-0.5 text-[11px] font-semibold uppercase tracking-wider"
-       style={{ color: 'rgba(255,255,255,0.35)' }}>
-      {children}
-    </p>
-  )
-}
-
-function Divider() {
-  return <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '4px 0' }} />
-}
-
-function Card({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-lg px-4 py-3" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
-      {children}
+    <div>
+      <p className="text-[11px] px-1 mb-1.5 font-medium uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.25)' }}>
+        {label}
+      </p>
+      <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        {children}
+      </div>
     </div>
   )
 }
 
-function SettingRow({ label, description, icon, children, accent: _accent }: {
+function ContextRow({ icon, label, desc, checked, onChange, accent }: {
+  icon: React.ReactNode
   label: string
-  description?: string
-  icon?: React.ReactNode
-  children?: React.ReactNode
-  accent?: string
+  desc: string
+  checked: boolean
+  onChange: (v: boolean) => void
+  accent: string
 }) {
   return (
-    <div className="flex items-start justify-between gap-4">
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          {icon && <span style={{ color: 'rgba(255,255,255,0.4)' }}>{icon}</span>}
-          <p className="text-[13px]" style={{ color: 'rgba(255,255,255,0.88)' }}>{label}</p>
+    <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <span style={{ color: checked ? accent : 'rgba(255,255,255,0.3)', flexShrink: 0 }}>{icon}</span>
+        <div className="min-w-0">
+          <p className="text-[13px]" style={{ color: 'rgba(255,255,255,0.85)' }}>{label}</p>
+          <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.35)' }}>{desc}</p>
         </div>
-        {description && (
-          <p className="text-[11px] mt-0.5 leading-relaxed" style={{ color: 'rgba(255,255,255,0.35)' }}>
-            {description}
-          </p>
-        )}
       </div>
-      {children && <div className="shrink-0 mt-0.5">{children}</div>}
+      <Toggle checked={checked} onChange={onChange} accent={accent} />
     </div>
   )
 }
@@ -331,33 +316,33 @@ function Toggle({ checked, onChange, accent }: { checked: boolean; onChange: (v:
   return (
     <button
       onClick={() => onChange(!checked)}
-      className="relative flex items-center w-10 h-[22px] rounded-full transition-all cursor-pointer shrink-0"
-      style={{ background: checked ? accent : 'rgba(255,255,255,0.18)' }}
+      className="relative flex items-center w-9 h-5 rounded-full transition-all cursor-pointer shrink-0"
+      style={{ background: checked ? accent : 'rgba(255,255,255,0.15)' }}
     >
       <span
-        className="absolute w-[18px] h-[18px] rounded-full bg-white transition-transform"
+        className="absolute w-4 h-4 rounded-full bg-white transition-transform"
         style={{
-          transform: checked ? 'translateX(20px)' : 'translateX(2px)',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+          transform: checked ? 'translateX(18px)' : 'translateX(2px)',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.35)'
         }}
       />
     </button>
   )
 }
 
-function Hotkey({ keys, label }: { keys: string[]; label: string }) {
+function HotkeyRow({ label, keys }: { label: string; keys: string[] }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-[12px]" style={{ color: 'rgba(255,255,255,0.6)' }}>{label}</span>
+      <span className="text-[12px]" style={{ color: 'rgba(255,255,255,0.5)' }}>{label}</span>
       <div className="flex items-center gap-1">
         {keys.map((k, i) => (
           <span
             key={i}
             className="text-[10px] px-1.5 py-0.5 rounded"
             style={{
-              background: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              color: 'rgba(255,255,255,0.55)',
+              background: 'rgba(255,255,255,0.07)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              color: 'rgba(255,255,255,0.45)',
               fontFamily: "'Segoe UI', system-ui, sans-serif"
             }}
           >
