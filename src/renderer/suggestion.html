@@ -16,10 +16,15 @@
     }
 
     #ghost {
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      font-size: 13px;
+      font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
+      /* line-height 1 so the glyphs sit centred on the caret's own centre line
+         rather than being nudged down by leading */
       line-height: 1;
-      color: rgba(128, 128, 128, 0.65);
+      /* Ghost text has to read as "not yet typed" against both light and dark
+         hosts, so lean on a mid grey plus a faint dark halo for contrast. */
+      color: rgba(150, 150, 155, 0.92);
+      text-shadow: 0 0 3px rgba(0, 0, 0, 0.55);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -29,15 +34,16 @@
 
     #hint {
       flex-shrink: 0;
-      margin-left: 6px;
-      font-family: 'Segoe UI', system-ui, sans-serif;
+      margin-left: 8px;
+      font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
       font-size: 9px;
-      color: rgba(128, 128, 128, 0.38);
-      background: rgba(128, 128, 128, 0.07);
-      border: 1px solid rgba(128, 128, 128, 0.14);
+      font-weight: 600;
+      color: rgba(210, 210, 215, 0.72);
+      background: rgba(70, 70, 78, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.16);
       border-radius: 3px;
       padding: 1px 4px;
-      letter-spacing: 0.03em;
+      letter-spacing: 0.04em;
     }
   </style>
 </head>
@@ -54,14 +60,36 @@
     }
     setVisible(false)
 
-    window.glide?.onSuggestionUpdate(text => {
-      ghost.textContent = text
-      setVisible(!!text)
-    })
-    window.glide?.onSuggestionAppend(token => {
-      ghost.textContent += token
+    // Report back so main can tell "painted" from "bridge missing". Previously
+    // this file used window.glide?.on… — optional chaining meant a missing
+    // bridge silently rendered nothing while main logged [SHOWING].
+    function report() {
+      try {
+        window.glide.reportRendered({
+          chars: ghost.textContent.length,
+          visible: ghost.style.display !== 'none'
+        })
+      } catch (e) { /* bridge gone; nothing we can do from here */ }
+    }
+
+    if (!window.glide || typeof window.glide.onSuggestionUpdate !== 'function') {
+      // Make the failure visible instead of silent
+      document.title = 'GLIDE BRIDGE MISSING'
+      ghost.textContent = '[Glide: preload bridge missing]'
+      ghost.style.color = 'rgba(255,120,120,0.95)'
       setVisible(true)
-    })
+    } else {
+      window.glide.onSuggestionUpdate(text => {
+        ghost.textContent = text
+        setVisible(!!text)
+        report()
+      })
+      window.glide.onSuggestionAppend(token => {
+        ghost.textContent += token
+        setVisible(true)
+        report()
+      })
+    }
   </script>
 </body>
 </html>

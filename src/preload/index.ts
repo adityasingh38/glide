@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, desktopCapturer } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('glide', {
   getSettings: () => ipcRenderer.invoke('settings:get'),
@@ -9,19 +9,13 @@ contextBridge.exposeInMainWorld('glide', {
   onSuggestionUpdate: (cb: (text: string) => void) =>
     ipcRenderer.on('suggestion:update', (_e, text) => cb(text)),
   onSuggestionAppend: (cb: (token: string) => void) =>
-    ipcRenderer.on('suggestion:append', (_e, token) => cb(token))
+    ipcRenderer.on('suggestion:append', (_e, token) => cb(token)),
+  // Lets the overlay confirm it actually painted, so a broken bridge can't look
+  // like a working suggestion in the logs.
+  reportRendered: (info: { chars: number; visible: boolean }) =>
+    ipcRenderer.send('suggestion:rendered', info)
 })
 
-// Screen capture: main asks this renderer to capture via desktopCapturer
-ipcRenderer.on('screen:capture-request', async () => {
-  try {
-    const sources = await desktopCapturer.getSources({
-      types: ['screen'],
-      thumbnailSize: { width: 1280, height: 720 }
-    })
-    const b64 = sources[0]?.thumbnail?.toPNG().toString('base64') ?? null
-    ipcRenderer.send('screen:capture-result', b64)
-  } catch {
-    ipcRenderer.send('screen:capture-result', null)
-  }
-})
+// Screen capture used to live here, but desktopCapturer is main-process-only
+// since Electron 17 — it was `undefined` in this context, so every capture threw
+// and screen context silently never worked. It now runs in src/main/screen-context.ts.
