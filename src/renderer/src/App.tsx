@@ -18,21 +18,31 @@ declare global {
       getSettings: () => Promise<Settings>
       setSettings: (patch: Partial<Settings>) => Promise<void>
       closeWindow: () => void
+      getAccentColor: () => Promise<string>
+      onSuggestionUpdate: (cb: (text: string) => void) => void
+      onSuggestionAppend: (cb: (token: string) => void) => void
     }
   }
 }
 
 const MODELS = [
-  { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 (fastest, cheapest)' },
-  { id: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5 (smarter)' },
-  { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 (best)' },
+  { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 — fastest, cheapest' },
+  { id: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5 — smarter' },
+  { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 — best' },
 ]
 
 export default function App() {
   const [s, setS] = useState<Settings | null>(null)
   const [showKey, setShowKey] = useState(false)
+  const [accent, setAccent] = useState('#0078d4')
 
-  useEffect(() => { window.glide.getSettings().then(setS) }, [])
+  useEffect(() => {
+    window.glide.getSettings().then(setS)
+    window.glide.getAccentColor().then(a => {
+      setAccent(a)
+      document.documentElement.style.setProperty('--accent', a)
+    })
+  }, [])
 
   async function update(patch: Partial<Settings>) {
     if (!s) return
@@ -42,45 +52,53 @@ export default function App() {
 
   if (!s) return (
     <div className="flex h-screen items-center justify-center">
-      <div className="w-3 h-3 rounded-full bg-violet-500 animate-pulse" />
+      <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: accent }} />
     </div>
   )
 
   return (
-    <div className="flex flex-col h-screen">
+    <div className="flex flex-col h-screen" style={{ background: 'rgba(30,30,30,0.82)' }}>
+
       {/* Title bar */}
       <div
-        className="flex items-center justify-between px-4 py-3 border-b border-zinc-800/80"
+        className="flex items-center justify-between pl-4 pr-1 h-10 shrink-0"
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
-        <div className="flex items-center gap-2.5">
-          <div className="w-1.5 h-1.5 rounded-full bg-violet-500" />
-          <span className="text-sm font-semibold">Glide</span>
-          <span className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-1.5 py-0.5 rounded">v0.1</span>
-        </div>
+        <span className="text-[13px] font-semibold tracking-tight" style={{ color: 'rgba(255,255,255,0.85)' }}>
+          Glide
+        </span>
         <button
-          className="text-zinc-600 hover:text-zinc-300 transition-colors cursor-pointer"
+          className="w-8 h-8 flex items-center justify-center rounded transition-colors cursor-pointer group"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           onClick={() => window.glide.closeWindow()}
         >
-          <X size={13} />
+          <X size={12} className="text-white/40 group-hover:text-white transition-colors" />
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      {/* Thin separator */}
+      <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', flexShrink: 0 }} />
+
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5">
 
         {/* Enable */}
-        <Card>
-          <Row label="Enable Glide" icon={<Zap size={13} />}>
-            <Toggle checked={s.enabled} onChange={v => update({ enabled: v })} />
-          </Row>
-        </Card>
+        <SettingRow
+          label="Enable Glide"
+          icon={<Zap size={14} />}
+          accent={accent}
+        >
+          <Toggle checked={s.enabled} onChange={v => update({ enabled: v })} accent={accent} />
+        </SettingRow>
 
-        {/* API key */}
-        <Card label="Claude API">
+        <Divider />
+
+        {/* API Key */}
+        <SectionLabel>Claude API</SectionLabel>
+
+        <Card>
           <div className="space-y-3">
             <div>
-              <label className="text-xs text-zinc-400 mb-1.5 block">API Key</label>
+              <label className="block text-[11px] mb-1.5" style={{ color: 'rgba(255,255,255,0.45)' }}>API Key</label>
               <div className="relative">
                 <input
                   type={showKey ? 'text' : 'password'}
@@ -90,108 +108,132 @@ export default function App() {
                   className="pr-8"
                 />
                 <button
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer transition-colors"
+                  style={{ color: 'rgba(255,255,255,0.35)' }}
                   onClick={() => setShowKey(v => !v)}
                 >
                   {showKey ? <EyeOff size={12} /> : <Eye size={12} />}
                 </button>
               </div>
-              <p className="text-[11px] text-zinc-600 mt-1.5">
-                Get one at <span className="text-violet-400">console.anthropic.com</span>
+              <p className="text-[11px] mt-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                Get one at <span style={{ color: accent }}>console.anthropic.com</span>
               </p>
             </div>
 
             <div>
-              <label className="text-xs text-zinc-400 mb-1.5 block">Model</label>
+              <label className="block text-[11px] mb-1.5" style={{ color: 'rgba(255,255,255,0.45)' }}>Model</label>
               <select value={s.model} onChange={e => update({ model: e.target.value })}>
-                {MODELS.map(m => (
-                  <option key={m.id} value={m.id}>{m.label}</option>
-                ))}
+                {MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
               </select>
             </div>
           </div>
         </Card>
 
+        <Divider />
+
         {/* Behaviour */}
-        <Card label="Behaviour">
+        <SectionLabel>Behaviour</SectionLabel>
+
+        <Card>
           <div className="space-y-4">
-            <Row
+            <SettingRow
               label="Trigger"
-              icon={<Key size={13} />}
-              description="Auto: predicts after you pause typing. Manual: only on Ctrl+Shift+Space."
+              description="Auto predicts after you pause. Manual only on Ctrl+Shift+Space."
+              icon={<Key size={14} />}
+              accent={accent}
             >
-              <div className="flex rounded-md overflow-hidden border border-zinc-700 text-xs shrink-0">
+              <div className="flex rounded-md overflow-hidden text-[12px] shrink-0" style={{ border: '1px solid rgba(255,255,255,0.12)' }}>
                 {(['auto', 'manual'] as const).map(t => (
                   <button
                     key={t}
                     onClick={() => update({ trigger: t })}
-                    className={`px-3 py-1.5 capitalize cursor-pointer transition-colors ${s.trigger === t ? 'bg-violet-700 text-white' : 'text-zinc-400 hover:text-zinc-200'}`}
+                    className="px-3 py-1 capitalize cursor-pointer transition-colors"
+                    style={s.trigger === t
+                      ? { background: accent, color: '#fff' }
+                      : { color: 'rgba(255,255,255,0.45)' }}
                   >
                     {t}
                   </button>
                 ))}
               </div>
-            </Row>
+            </SettingRow>
 
-            <Row
+            <SettingRow
               label={`Debounce — ${s.debounceMs}ms`}
-              icon={<Clock size={13} />}
-              description="How long after you stop typing before a prediction fires."
+              description="Pause after typing before a prediction fires."
+              icon={<Clock size={14} />}
+              accent={accent}
             >
               <input
                 type="range" min={300} max={2000} step={100}
                 value={s.debounceMs}
                 onChange={e => update({ debounceMs: parseInt(e.target.value) })}
-                className="w-28 shrink-0"
+                className="w-24 shrink-0"
                 disabled={s.trigger === 'manual'}
               />
-            </Row>
+            </SettingRow>
 
-            <Row
+            <SettingRow
               label={`Max tokens — ${s.maxTokens}`}
-              description="Max length of each completion (longer = slower)."
+              description="Longer completions take more time."
+              accent={accent}
             >
               <input
                 type="range" min={10} max={80} step={5}
                 value={s.maxTokens}
                 onChange={e => update({ maxTokens: parseInt(e.target.value) })}
-                className="w-28 shrink-0"
+                className="w-24 shrink-0"
               />
-            </Row>
+            </SettingRow>
           </div>
         </Card>
+
+        <Divider />
 
         {/* Context */}
-        <Card label="Context">
+        <SectionLabel>Context</SectionLabel>
+
+        <Card>
           <div className="space-y-4">
-            <Row
+            <SettingRow
               label="Clipboard Context"
-              icon={<Clipboard size={13} />}
-              description="Reads your clipboard before each prediction to understand what you've copied."
+              description="Reads your clipboard before each prediction."
+              icon={<Clipboard size={14} />}
+              accent={accent}
             >
-              <Toggle checked={s.clipboardContext} onChange={v => update({ clipboardContext: v })} />
-            </Row>
-            <Row
+              <Toggle checked={s.clipboardContext} onChange={v => update({ clipboardContext: v })} accent={accent} />
+            </SettingRow>
+            <SettingRow
               label="Screen Context"
-              icon={<Monitor size={13} />}
-              description="Captures a screenshot of your screen before each prediction so Glide understands what you're looking at."
+              description="Captures your screen so Glide sees what you're looking at."
+              icon={<Monitor size={14} />}
+              accent={accent}
             >
-              <Toggle checked={s.screenContext} onChange={v => update({ screenContext: v })} />
-            </Row>
+              <Toggle checked={s.screenContext} onChange={v => update({ screenContext: v })} accent={accent} />
+            </SettingRow>
           </div>
         </Card>
 
+        <Divider />
+
         {/* Hotkeys */}
-        <Card label="Hotkeys">
-          <div className="space-y-2 text-xs text-zinc-400">
+        <SectionLabel>Hotkeys</SectionLabel>
+
+        <Card>
+          <div className="space-y-2">
             <Hotkey keys={['Ctrl', 'Space']} label="Accept suggestion" />
             <Hotkey keys={['Ctrl', 'Shift', 'Space']} label="Trigger manually" />
             <Hotkey keys={['Esc']} label="Dismiss" />
           </div>
         </Card>
+
       </div>
 
-      <div className="px-4 py-2.5 border-t border-zinc-800 text-[11px] text-zinc-600 flex justify-between">
+      {/* Footer */}
+      <div
+        className="px-4 py-2 flex justify-between shrink-0"
+        style={{ borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: 11, color: 'rgba(255,255,255,0.25)' }}
+      >
         <span>Glide · tray app</span>
         <span>adityasingh38</span>
       </div>
@@ -199,43 +241,66 @@ export default function App() {
   )
 }
 
-function Card({ label, children }: { label?: string; children: React.ReactNode }) {
+function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-lg bg-zinc-900 border border-zinc-800 overflow-hidden">
-      {label && (
-        <div className="px-4 py-2 border-b border-zinc-800">
-          <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider">{label}</p>
-        </div>
-      )}
-      <div className="p-4">{children}</div>
+    <p className="px-1 pt-0.5 text-[11px] font-semibold uppercase tracking-wider"
+       style={{ color: 'rgba(255,255,255,0.35)' }}>
+      {children}
+    </p>
+  )
+}
+
+function Divider() {
+  return <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '4px 0' }} />
+}
+
+function Card({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-lg px-4 py-3" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
+      {children}
     </div>
   )
 }
 
-function Row({ label, description, icon, children }: {
-  label: string; description?: string; icon?: React.ReactNode; children?: React.ReactNode
+function SettingRow({ label, description, icon, children, accent: _accent }: {
+  label: string
+  description?: string
+  icon?: React.ReactNode
+  children?: React.ReactNode
+  accent?: string
 }) {
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="min-w-0">
-        <div className="flex items-center gap-1.5">
-          {icon && <span className="text-zinc-500">{icon}</span>}
-          <p className="text-sm text-zinc-200">{label}</p>
+        <div className="flex items-center gap-2">
+          {icon && <span style={{ color: 'rgba(255,255,255,0.4)' }}>{icon}</span>}
+          <p className="text-[13px]" style={{ color: 'rgba(255,255,255,0.88)' }}>{label}</p>
         </div>
-        {description && <p className="text-[11px] text-zinc-500 mt-0.5 leading-relaxed">{description}</p>}
+        {description && (
+          <p className="text-[11px] mt-0.5 leading-relaxed" style={{ color: 'rgba(255,255,255,0.35)' }}>
+            {description}
+          </p>
+        )}
       </div>
       {children && <div className="shrink-0 mt-0.5">{children}</div>}
     </div>
   )
 }
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ checked, onChange, accent }: { checked: boolean; onChange: (v: boolean) => void; accent: string }) {
   return (
     <button
       onClick={() => onChange(!checked)}
-      className={`relative flex items-center w-9 h-5 rounded-full transition-colors cursor-pointer ${checked ? 'bg-violet-600' : 'bg-zinc-700'}`}
+      className="relative flex items-center w-10 h-[22px] rounded-full transition-all cursor-pointer shrink-0"
+      style={{ background: checked ? accent : 'rgba(255,255,255,0.18)' }}
     >
-      <span className={`absolute w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${checked ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+      <span
+        className="absolute w-[18px] h-[18px] rounded-full bg-white transition-transform"
+        style={{
+          transform: checked ? 'translateX(20px)' : 'translateX(2px)',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+        }}
+      />
     </button>
   )
 }
@@ -243,10 +308,21 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 function Hotkey({ keys, label }: { keys: string[]; label: string }) {
   return (
     <div className="flex items-center justify-between">
-      <span>{label}</span>
+      <span className="text-[12px]" style={{ color: 'rgba(255,255,255,0.6)' }}>{label}</span>
       <div className="flex items-center gap-1">
         {keys.map((k, i) => (
-          <span key={i} className="bg-zinc-800 border border-zinc-700 rounded px-1.5 py-0.5 text-[10px] font-mono text-zinc-300">{k}</span>
+          <span
+            key={i}
+            className="text-[10px] px-1.5 py-0.5 rounded"
+            style={{
+              background: 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              color: 'rgba(255,255,255,0.55)',
+              fontFamily: "'Segoe UI', system-ui, sans-serif"
+            }}
+          >
+            {k}
+          </span>
         ))}
       </div>
     </div>

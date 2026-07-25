@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, Tray, nativeImage, ipcMain, globalShortcut } from 'electron'
+import { app, BrowserWindow, Menu, Tray, nativeImage, ipcMain, globalShortcut, systemPreferences } from 'electron'
 import { join } from 'node:path'
 import { createSuggestionWindow } from './suggestion-window'
 import { startKeystrokeTracker, stopKeystrokeTracker, acceptSuggestion, dismissSuggestion, triggerPrediction } from './keystroke-tracker'
@@ -14,19 +14,24 @@ function createSettingsWindow(): void {
     return
   }
   settingsWin = new BrowserWindow({
-    width: 500,
+    width: 460,
     height: 580,
     resizable: false,
     frame: false,
     show: false,
-    titleBarStyle: 'hidden',
-    backgroundColor: '#09090b',
+    transparent: true,
+    // Opaque fallback for Windows 10 (Mica not available)
+    backgroundColor: '#00000000',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false
     }
   })
+
+  // Windows 11 Mica material — silently no-ops on Win10
+  try { (settingsWin as any).setBackgroundMaterial('mica') } catch {}
+
   settingsWin.once('ready-to-show', () => settingsWin!.show())
   if (process.env.ELECTRON_RENDERER_URL) {
     settingsWin.loadURL(process.env.ELECTRON_RENDERER_URL)
@@ -61,19 +66,16 @@ app.whenReady().then(() => {
   createSuggestionWindow()
   startKeystrokeTracker()
 
-  // Ctrl+Space — accept the visible suggestion
   globalShortcut.register('Ctrl+Space', () => {
     const { enabled } = readSettings()
     if (enabled) acceptSuggestion()
   })
 
-  // Ctrl+Shift+Space — manually trigger a prediction (for 'manual' trigger mode)
   globalShortcut.register('Ctrl+Shift+Space', () => {
     const { enabled } = readSettings()
     if (enabled) triggerPrediction()
   })
 
-  // Escape — dismiss without accepting (backup; keystroke tracker also handles this)
   globalShortcut.register('Escape', () => dismissSuggestion())
 
   const iconPath = join(__dirname, '../../build/tray.png')
@@ -85,11 +87,18 @@ app.whenReady().then(() => {
   tray.setContextMenu(buildTrayMenu())
   tray.on('click', () => tray?.popUpContextMenu())
 
-
   ipcMain.handle('settings:get', () => readSettings())
   ipcMain.handle('settings:set', (_e, patch: Partial<Settings>) => {
     writeSettings(patch)
     tray?.setContextMenu(buildTrayMenu())
+  })
+  ipcMain.handle('system:accentColor', () => {
+    try {
+      const hex = systemPreferences.getAccentColor() // 'rrggbbaa'
+      return `#${hex.slice(0, 6)}`
+    } catch {
+      return '#0078d4' // Windows blue fallback
+    }
   })
   ipcMain.on('window:close', () => settingsWin?.close())
 })
