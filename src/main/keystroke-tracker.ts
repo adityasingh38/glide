@@ -1,9 +1,9 @@
 import { uIOhook, UiohookKey } from 'uiohook-napi'
-import { streamCompletion } from './claude-client'
-import { showSuggestion, appendSuggestion, hideSuggestion } from './suggestion-window'
+import { streamCompletion, type CompletionContext } from './claude-client'
+import { showSuggestion, appendSuggestion, hideSuggestion, captureScreen } from './suggestion-window'
 import { readSettings } from './store'
 import { clipboard } from 'electron'
-import { sendCtrlV } from './win32'
+import { sendCtrlV, getActiveWindowTitle } from './win32'
 
 // Rolling text buffer — tracks what the user has typed since last reset
 let buffer = ''
@@ -86,9 +86,22 @@ function schedulePrediction(): void {
   }, debounceMs)
 }
 
-export function triggerPrediction(): void {
+export async function triggerPrediction(): Promise<void> {
   cancelStream()
   if (buffer.trim().length < 3) return
+
+  const { clipboardContext, screenContext } = readSettings()
+  const ctx: CompletionContext = {}
+
+  if (screenContext) {
+    ctx.windowTitle = getActiveWindowTitle()
+    ctx.screenB64 = (await captureScreen()) ?? undefined
+  }
+
+  if (clipboardContext) {
+    const clip = clipboard.readText()
+    if (clip) ctx.clipboard = clip
+  }
 
   const controller = new AbortController()
   streamController = controller
@@ -98,6 +111,7 @@ export function triggerPrediction(): void {
 
   streamCompletion(
     buffer,
+    ctx,
     (token) => {
       currentSuggestion += token
       if (firstToken) {
@@ -117,6 +131,7 @@ export function triggerPrediction(): void {
     controller.signal
   )
 }
+
 
 export function acceptSuggestion(): void {
   if (!suggestionVisible || !currentSuggestion) return

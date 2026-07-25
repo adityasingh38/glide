@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { X, Eye, EyeOff, Key, Zap, Clock } from 'lucide-react'
+import { X, Eye, EyeOff, Key, Zap, Clock, Clipboard, Monitor } from 'lucide-react'
 
 interface Settings {
   enabled: boolean
@@ -8,6 +8,8 @@ interface Settings {
   debounceMs: number
   maxTokens: number
   trigger: 'auto' | 'manual'
+  clipboardContext: boolean
+  screenContext: boolean
 }
 
 declare global {
@@ -155,6 +157,26 @@ export default function App() {
                 onChange={e => update({ maxTokens: parseInt(e.target.value) })}
                 className="w-28 shrink-0"
               />
+            </Row>
+          </div>
+        </Card>
+
+        {/* Context */}
+        <Card label="Context">
+          <div className="space-y-4">
+            <Row
+              label="Clipboard Context"
+              icon={<Clipboard size={13} />}
+              description="Reads your clipboard before each prediction to understand what you've copied."
+            >
+              <Toggle checked={s.clipboardContext} onChange={v => update({ clipboardContext: v })} />
+            </Row>
+            <Row
+              label="Screen Context"
+              icon={<Monitor size={13} />}
+              description="Captures a screenshot of your screen before each prediction so Glide understands what you're looking at."
+            >
+              <Toggle checked={s.screenContext} onChange={v => update({ screenContext: v })} />
             </Row>
           </div>
         </Card>

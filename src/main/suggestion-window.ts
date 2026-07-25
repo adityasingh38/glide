@@ -1,4 +1,4 @@
-import { BrowserWindow, screen } from 'electron'
+import { BrowserWindow, screen, ipcMain } from 'electron'
 import { join } from 'node:path'
 import { getCaretScreenPos } from './win32'
 
@@ -75,4 +75,22 @@ export function hideSuggestion(): void {
 
 export function getSuggestionWindow(): BrowserWindow | null {
   return win
+}
+
+export function captureScreen(): Promise<string | null> {
+  if (!win || win.isDestroyed()) return Promise.resolve(null)
+  return new Promise<string | null>((resolve) => {
+    const timeout = setTimeout(() => {
+      ipcMain.removeListener('screen:capture-result', handler)
+      resolve(null)
+    }, 5000)
+
+    function handler(_e: unknown, b64: string | null) {
+      clearTimeout(timeout)
+      resolve(b64)
+    }
+
+    ipcMain.once('screen:capture-result', handler)
+    win!.webContents.send('screen:capture-request')
+  })
 }

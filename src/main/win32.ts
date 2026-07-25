@@ -33,6 +33,8 @@ const GUITHREADINFO = koffi.struct('GUITHREADINFO', {
 const GetGUIThreadInfo = user32.func('int GetGUIThreadInfo(uint idThread, _Inout_ GUITHREADINFO *pgui)')
 const ClientToScreen = user32.func('int ClientToScreen(void *hWnd, _Inout_ POINT *lpPoint)')
 const SendInput = user32.func('uint SendInput(uint nInputs, void *pInputs, int cbSize)')
+const GetForegroundWindow = user32.func('void *GetForegroundWindow()')
+const GetWindowTextW = user32.func('int GetWindowTextW(void *hWnd, void *lpString, int nMaxCount)')
 
 // ── Public API ─────────────────────────────────────────────────────────────
 
@@ -78,6 +80,19 @@ function makeVkInput(vk: number, up: boolean): Buffer {
   buf.writeUInt16LE(vk, 8)          // wVk
   buf.writeUInt32LE(up ? KEYEVENTF_KEYUP : 0, 12)  // dwFlags
   return buf
+}
+
+export function getActiveWindowTitle(): string {
+  try {
+    const hwnd = GetForegroundWindow()
+    if (!hwnd) return ''
+    const buf = Buffer.alloc(1024)
+    const len = GetWindowTextW(hwnd, buf, 512)
+    if (len <= 0) return ''
+    return buf.toString('utf16le', 0, len * 2)
+  } catch {
+    return ''
+  }
 }
 
 export function sendCtrlV(): void {

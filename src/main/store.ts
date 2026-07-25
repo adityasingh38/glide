@@ -8,7 +8,9 @@ export interface Settings {
   model: string
   debounceMs: number
   maxTokens: number
-  trigger: 'auto' | 'manual'   // auto = after pause, manual = Ctrl+Shift+Space
+  trigger: 'auto' | 'manual'
+  clipboardContext: boolean
+  screenContext: boolean
 }
 
 const defaults: Settings = {
@@ -17,7 +19,9 @@ const defaults: Settings = {
   model: 'claude-haiku-4-5-20251001',
   debounceMs: 800,
   maxTokens: 40,
-  trigger: 'auto'
+  trigger: 'auto',
+  clipboardContext: false,
+  screenContext: false
 }
 
 function settingsPath(): string {
