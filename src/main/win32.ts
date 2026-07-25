@@ -1,4 +1,5 @@
 import koffi from 'koffi'
+import { getCaretViaUia, nudgeAccessibility, getFocusedFieldText } from './uia-caret'
 
 const user32 = koffi.load('user32.dll')
 
@@ -44,6 +45,16 @@ export interface CaretScreenPos {
   h: number   // caret height for positioning suggestion below
 }
 
+/**
+ * Caret position in screen coords, or null if it can't be determined.
+ *
+ * Two strategies, in order of cost:
+ *  1. GetGUIThreadInfo — cheap, but only native Win32 edit controls report a
+ *     caret rect here.
+ *  2. UI Automation TextPattern — covers Chromium/Electron apps (Chrome, VS
+ *     Code, Claude Code, Slack, Discord), which draw their own caret and report
+ *     nothing to GetGUIThreadInfo.
+ */
 export function getCaretScreenPos(): CaretScreenPos | null {
   const gti = {
     cbSize: 0, flags: 0,
@@ -53,14 +64,22 @@ export function getCaretScreenPos(): CaretScreenPos | null {
   }
   gti.cbSize = koffi.sizeof(GUITHREADINFO)
   const ok = GetGUIThreadInfo(0, gti)
-  if (!ok || !gti.hwndCaret) return null
 
-  const r = gti.rcCaret
-  const pt = { x: r.left, y: r.top }
-  ClientToScreen(gti.hwndCaret, pt)
+  if (ok && gti.hwndCaret) {
+    const r = gti.rcCaret
+    const pt = { x: r.left, y: r.top }
+    ClientToScreen(gti.hwndCaret, pt)
+    return { x: pt.x, y: pt.y, h: Math.max(r.bottom - r.top, 16) }
+  }
 
-  return { x: pt.x, y: pt.y, h: Math.max(r.bottom - r.top, 16) }
+  // Chromium/Electron path
+  const uia = getCaretViaUia()
+  if (uia) return { x: uia.x, y: uia.y, h: Math.max(uia.h, 16) }
+
+  return null
 }
+
+export { nudgeAccessibility, getFocusedFieldText }
 
 // INPUT struct is 40 bytes on x64 Windows:
 //   offset 0: type (DWORD = 4)
@@ -82,8 +101,21 @@ function makeVkInput(vk: number, up: boolean): Buffer {
   return buf
 }
 
-export function getForegroundHwnd(): unknown {
-  try { return GetForegroundWindow() } catch { return null }
+/**
+ * Identity of the foreground window as a comparable primitive.
+ *
+ * koffi hands back a NEW JS wrapper object for every `void *` return, so
+ * comparing the raw handles with !== is always true. Compare addresses instead.
+ */
+export function getForegroundWindowId(): string {
+  try {
+    const h = GetForegroundWindow()
+    if (!h) return ''
+    return String(koffi.address(h))
+  } catch {
+    // Fall back to the title if address() is unavailable
+    return getActiveWindowTitle()
+  }
 }
 
 export function getActiveWindowTitle(): string {
