@@ -3,13 +3,14 @@ import { globalShortcut, clipboard } from 'electron'
 import { streamCompletion, type CompletionContext } from './claude-client'
 import { showSuggestion, appendSuggestion, hideSuggestion, captureScreen } from './suggestion-window'
 import { readSettings } from './store'
-import { sendCtrlV, getActiveWindowTitle } from './win32'
+import { sendCtrlV, getActiveWindowTitle, getForegroundHwnd } from './win32'
 
 let buffer = ''
 let streamController: AbortController | null = null
 let currentSuggestion = ''
 let suggestionVisible = false
 let tabRegistered = false
+let lastHwnd: unknown = null
 
 function registerTab(): void {
   if (tabRegistered) return
@@ -73,6 +74,7 @@ function keycodeToChar(keycode: number, shift: boolean): string {
 function resetBuffer(reason?: string): void {
   if (reason) console.log('[glide] buffer reset:', reason)
   buffer = ''
+  lastHwnd = null
   cancelStream()
   hideSuggestion()
   suggestionVisible = false
@@ -164,6 +166,13 @@ export function dismissSuggestion(): void {
 export function startKeystrokeTracker(): void {
   uIOhook.on('keydown', (event) => {
     const { keycode, shiftKey, ctrlKey, altKey, metaKey } = event
+
+    // Reset buffer when user switches windows so we don't bleed context across apps
+    const hwnd = getForegroundHwnd()
+    if (hwnd !== lastHwnd) {
+      if (lastHwnd !== null) resetBuffer('window-change')
+      lastHwnd = hwnd
+    }
 
     // Ctrl/Alt combos — most are destructive to buffer context
     if (ctrlKey || altKey || metaKey) {

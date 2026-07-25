@@ -82,6 +82,10 @@ function makeVkInput(vk: number, up: boolean): Buffer {
   return buf
 }
 
+export function getForegroundHwnd(): unknown {
+  try { return GetForegroundWindow() } catch { return null }
+}
+
 export function getActiveWindowTitle(): string {
   try {
     const hwnd = GetForegroundWindow()
